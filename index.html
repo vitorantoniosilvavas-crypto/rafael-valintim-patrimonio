@@ -32,6 +32,7 @@ body{background:var(--paper); color:var(--ink); font-family:'IBM Plex Sans',syst
 .wrap{flex:1; max-width:1120px; padding:28px 24px 64px; min-width:0;}
 @media (max-width:760px){
   .app-shell{flex-direction:column;}
+  .wrap{width:100%; max-width:100%;}
   .sidebar{width:100%; position:static; min-height:auto; padding:16px;}
   .workspace-switch{margin-bottom:14px;}
   .sidebar nav.tabs{flex-direction:row; flex-wrap:nowrap; overflow-x:auto; gap:8px; padding-bottom:4px; -webkit-overflow-scrolling:touch;}
@@ -63,6 +64,7 @@ nav.tabs button:disabled{opacity:.5; cursor:default;}
 .tiles{display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:20px;}
 .tiles.tiles-4{grid-template-columns:repeat(4,1fr);}
 @media (max-width:900px){.tiles.tiles-4{grid-template-columns:repeat(2,1fr);}}
+@media (max-width:480px){.tiles.tiles-4{grid-template-columns:1fr;}}
 @media (max-width:700px){.tiles{grid-template-columns:1fr;}}
 .tile{background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:16px; box-shadow:var(--shadow); position:relative; overflow:hidden; transition:box-shadow .15s ease, transform .15s ease;}
 .tile::before{content:''; position:absolute; top:0; left:0; right:0; height:4px; background:var(--line);}
@@ -72,7 +74,8 @@ nav.tabs button:disabled{opacity:.5; cursor:default;}
 .tile.negative{background:linear-gradient(135deg, rgba(226,105,79,.09), var(--surface) 65%);}
 .tile:hover{box-shadow:0 4px 16px rgba(14,39,64,.14); transform:translateY(-1px);}
 .tile .label{font-size:.74rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; min-height:2.2em; display:flex; align-items:flex-start; line-height:1.15;}
-.tile .value{font-size:1.4rem; font-weight:600; margin-top:6px;}
+.tile .value{font-size:1.4rem; font-weight:600; margin-top:6px; overflow-wrap:break-word;}
+@media (max-width:480px){.tile .value{font-size:1.15rem;}}
 .tile.positive .value{color:var(--positive);} .tile.brass .value{color:var(--brass-ink);} .tile.negative .value{color:var(--negative);}
 .banner{border-radius:8px; padding:10px 14px; font-size:.85rem; margin-bottom:20px; display:flex; gap:10px; align-items:center;}
 .banner.ok{background:var(--positive-soft); border:1px solid var(--positive); color:var(--positive);}
@@ -1417,6 +1420,7 @@ function renderFluxoTab(){
 
 function renderFxTimeline(cur){
   const el=document.getElementById('fx-timeline');
+  el.style.overflowX='auto'; el.style.webkitOverflowScrolling='touch';
   const N=16, start=mesIdx(cur)-3;
   const months=[]; for(let i=0;i<N;i++) months.push(idxMes(start+i));
   const data=months.map(m=>fxMonth(m,cur));
@@ -1425,7 +1429,7 @@ function renderFxTimeline(cur){
   data.forEach(d=>{ acc+=d.ent-d.sai; d.caixa=acc; });
   renderFxAlert(data);
 
-  const w=Math.max(el.clientWidth||700,460), h=410, m={top:22,right:16,left:64};
+  const w=Math.max(el.clientWidth||700, N*46), h=410, m={top:22,right:16,left:64};
   const innerW=w-m.left-m.right, slot=innerW/N, bw=Math.min(slot*0.6,34);
   const barsH=220, zero=m.top+barsH/2;
   const rawMax=Math.max(1,...data.map(d=>Math.max(d.ent,d.sai)))*1.08, stp=Math.pow(10,Math.floor(Math.log10(rawMax)))/2, yMax=Math.ceil(rawMax/stp)*stp, k=(barsH/2)/yMax;
@@ -1462,7 +1466,7 @@ function renderFxTimeline(cur){
     s+=`<text x="${cx(i).toFixed(1)}" y="${(ly(d.caixa)-8).toFixed(1)}" text-anchor="middle" font-size="9" fill="${d.caixa<0?'var(--negative)':'var(--brass-ink)'}">${fxK(d.caixa)}</text>`;
     s+=`<rect data-i="${i}" x="${(cx(i)-slot/2).toFixed(1)}" y="${m.top}" width="${slot.toFixed(1)}" height="${h-m.top}" fill="transparent"/>`;
   });
-  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}">${s}</svg>`;
+  el.innerHTML=`<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" style="display:block; max-width:none;">${s}</svg>`;
   let tt=el.querySelector('.chart-tooltip');
   if(!tt){tt=document.createElement('div');tt.className='chart-tooltip';el.appendChild(tt);}
   el.querySelectorAll('rect[data-i]').forEach(r=>{
