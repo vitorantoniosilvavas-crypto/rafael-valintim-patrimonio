@@ -101,6 +101,8 @@ input[type=number]{width:100%; border:1px solid var(--line); background:var(--su
 form{display:flex; flex-direction:column; gap:10px;}
 form>div{min-width:0;}
 input, select, textarea{min-width:0; max-width:100%;}
+.month-picker{display:flex; gap:6px; min-width:0;}
+.month-picker select{flex:1; min-width:0;}
 .row{display:flex; gap:8px; min-width:0;} .row>*{flex:1; min-width:0;}
 @media (max-width:640px){ .row{flex-wrap:wrap;} .row>*{flex:1 1 130px;} }
 label{font-size:.75rem; color:var(--muted); display:block; margin-bottom:3px;}
@@ -360,7 +362,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
         <p class="sub">Um lançamento por mês, consolidando o que entrou e saiu. Se o mês já existe, ele é atualizado.</p>
         <form id="fx-form">
           <div><label for="fx-saldo">Saldo inicial de caixa (U$)</label><input type="number" id="fx-saldo" step="0.01" value="0"></div>
-          <div><label for="fx-mes">Mês</label><input type="month" id="fx-mes" required></div>
+          <div><label>Mês</label><div class="month-picker"><select id="fx-mes-mm" required></select><select id="fx-mes-yy" required></select></div></div>
           <div class="row">
             <div><label for="fx-ent">Entrou (U$)</label><input type="number" id="fx-ent" min="0" step="0.01" value="0"></div>
             <div><label for="fx-sai">Saiu (U$)</label><input type="number" id="fx-sai" min="0" step="0.01" value="0"></div>
@@ -382,8 +384,8 @@ td.num, th.num{text-align:right; white-space:nowrap;}
         <div class="row">
           <div style="flex:2"><label for="pj-nome">Projeto</label><input type="text" id="pj-nome" required></div>
           <div><label for="pj-pct">% concluído</label><input type="number" id="pj-pct" min="0" max="100" step="1" value="0"></div>
-          <div><label for="pj-ini">Início</label><input type="month" id="pj-ini" required></div>
-          <div><label for="pj-fim">Fim</label><input type="month" id="pj-fim" required></div>
+          <div><label>Início</label><div class="month-picker"><select id="pj-ini-mm" required></select><select id="pj-ini-yy" required></select></div></div>
+          <div><label>Fim</label><div class="month-picker"><select id="pj-fim-mm" required></select><select id="pj-fim-yy" required></select></div></div>
         </div>
         <div class="aloc-grid">
           <div style="font-size:.8rem; font-weight:700">Despesas previstas por categoria (U$)</div>
@@ -1357,6 +1359,32 @@ function initPatrimonioForms(){
 const S_FX='patrimonio-rafael:fluxo', S_PJ='patrimonio-rafael:projetos';
 let fluxo={saldoInicial:0,meses:{}}, projetos=[], editingPjId=null;
 const MESES_ABR=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const MESES_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+// Seletores de mês/ano em vez de <input type="month">: esse input nativo renderiza de forma inconsistente
+// (às vezes largo demais) em Safari/iOS, então usamos dois <select> comuns — idênticos em qualquer navegador.
+function mesOptionsHTML(selMM){ return MESES_FULL.map((n,i)=>{const v=String(i+1).padStart(2,'0'); return `<option value="${v}" ${v===selMM?'selected':''}>${n}</option>`;}).join(''); }
+function anoOptionsHTML(before,after,selYY){
+  const y0=new Date().getFullYear()-before, y1=new Date().getFullYear()+after;
+  let out='', hit=false;
+  for(let a=y0;a<=y1;a++){ if(String(a)===selYY) hit=true; out+=`<option value="${a}" ${String(a)===selYY?'selected':''}>${a}</option>`; }
+  if(selYY && !hit) out=`<option value="${selYY}" selected>${selYY}</option>`+out;
+  return out;
+}
+function fillMonthSelect(prefix,before,after,val){
+  const [yy,mm]=(val||'').split('-');
+  const mmEl=document.getElementById(prefix+'-mm'), yyEl=document.getElementById(prefix+'-yy');
+  if(mmEl) mmEl.innerHTML=mesOptionsHTML(mm);
+  if(yyEl) yyEl.innerHTML=anoOptionsHTML(before,after,yy);
+}
+function getMonthSel(prefix){
+  const mm=document.getElementById(prefix+'-mm'), yy=document.getElementById(prefix+'-yy');
+  return (yy?yy.value:'')+'-'+(mm?mm.value:'');
+}
+function setMonthSel(prefix,val){ if(!val) return; fillMonthSelect(prefix,5,25,val); }
+function monthPickerRowHTML(i,val){
+  const [yy,mm]=(val||'').split('-');
+  return `<div class="month-picker"><select data-mi="${i}" data-f="mes_mm">${mesOptionsHTML(mm)}</select><select data-mi="${i}" data-f="mes_yy">${anoOptionsHTML(5,25,yy)}</select></div>`;
+}
 function loadFluxo(){
   try{ fluxo=JSON.parse(localStorage.getItem(S_FX)||'null')||fluxo; projetos=JSON.parse(localStorage.getItem(S_PJ)||'[]'); }catch(e){}
 }
@@ -1570,19 +1598,22 @@ function initFluxo(){
   let rz; window.addEventListener('resize',()=>{ clearTimeout(rz); rz=setTimeout(()=>{ if(document.getElementById('tab-fluxo').classList.contains('active')) renderFluxoTab(); },150); });
   document.getElementById('tabs-nav').addEventListener('click',e=>{ if(e.target.matches('[data-tab=fluxo]')) requestAnimationFrame(renderFluxoTab); });
   const cur=mesAtual();
-  document.getElementById('fx-mes').value=cur;
-  const fillFx=()=>{ const v=fluxo.meses[document.getElementById('fx-mes').value]; document.getElementById('fx-ent').value=v?v.ent:0; document.getElementById('fx-sai').value=v?v.sai:0; document.getElementById('fx-obs').value=v&&v.obs?v.obs:''; };
-  document.getElementById('fx-mes').addEventListener('change',fillFx);
+  fillMonthSelect('fx-mes',3,20,cur);
+  fillMonthSelect('pj-ini',5,25,'');
+  fillMonthSelect('pj-fim',5,25,'');
+  const fillFx=()=>{ const v=fluxo.meses[getMonthSel('fx-mes')]; document.getElementById('fx-ent').value=v?v.ent:0; document.getElementById('fx-sai').value=v?v.sai:0; document.getElementById('fx-obs').value=v&&v.obs?v.obs:''; };
+  document.getElementById('fx-mes-mm').addEventListener('change',fillFx);
+  document.getElementById('fx-mes-yy').addEventListener('change',fillFx);
   document.getElementById('fx-saldo').addEventListener('input',e=>{ fluxo.saldoInicial=parseFloat(e.target.value)||0; saveFx(); renderFluxoTab(); });
   document.getElementById('fx-form').addEventListener('submit',e=>{
     e.preventDefault();
-    const m=document.getElementById('fx-mes').value; if(!m) return;
+    const m=getMonthSel('fx-mes'); if(!m) return;
     fluxo.meses[m]={ent:parseFloat(document.getElementById('fx-ent').value)||0, sai:parseFloat(document.getElementById('fx-sai').value)||0, obs:document.getElementById('fx-obs').value.trim()};
     saveFx(); renderFluxoTab();
   });
   document.getElementById('fx-tbody').addEventListener('click',e=>{
     const ed=e.target.dataset.editFx, dl=e.target.dataset.delFx;
-    if(ed){ document.getElementById('fx-mes').value=ed; fillFx(); document.getElementById('fx-ent').focus(); }
+    if(ed){ setMonthSel('fx-mes',ed); fillFx(); document.getElementById('fx-ent').focus(); }
     if(dl&&confirm('Apagar o lançamento de '+mesLabel(dl)+'?')){ delete fluxo.meses[dl]; saveFx(); renderFluxoTab(); }
   });
   let marcosDraft=[];
@@ -1590,7 +1621,7 @@ function initFluxo(){
   const totalDesp=()=>{ const t=DESP_CATS.reduce((s,[k])=>s+val('pj-d-'+k),0); document.getElementById('pj-d-total').textContent='Despesa total: '+fmt.format(t); };
   const drawMarcos=()=>{
     document.getElementById('pj-marcos').innerHTML=marcosDraft.map((x,i)=>`<div class="row" style="align-items:flex-end">
-      <div><label>Mês</label><input type="month" value="${x.mes||''}" data-mi="${i}" data-f="mes"></div>
+      <div><label>Mês</label>${monthPickerRowHTML(i,x.mes)}</div>
       <div><label>Valor (U$)</label><input type="number" min="0" step="0.01" value="${x.valor||0}" data-mi="${i}" data-f="valor"></div>
       <div style="flex:1.4"><label>Descrição</label><input type="text" value="${escFx(x.desc||'')}" data-mi="${i}" data-f="desc"></div>
       <div style="flex:0 0 auto"><button type="button" class="btn secondary" data-rm-marco="${i}">×</button></div></div>`).join('');
@@ -1599,13 +1630,22 @@ function initFluxo(){
   totalDesp();
   document.getElementById('pj-add-marco').addEventListener('click',()=>{ marcosDraft.push({mes:'',valor:0,desc:''}); drawMarcos(); });
   const mbox=document.getElementById('pj-marcos');
-  mbox.addEventListener('input',e=>{ const i=e.target.dataset.mi; if(i===undefined) return; marcosDraft[i][e.target.dataset.f]=e.target.dataset.f==='valor'?(parseFloat(e.target.value)||0):e.target.value; });
+  mbox.addEventListener('input',e=>{
+    const i=e.target.dataset.mi; if(i===undefined) return;
+    const f=e.target.dataset.f;
+    if(f==='valor') marcosDraft[i].valor=parseFloat(e.target.value)||0;
+    else if(f==='desc') marcosDraft[i].desc=e.target.value;
+    else if(f==='mes_mm'||f==='mes_yy'){
+      const mmEl=mbox.querySelector(`[data-mi="${i}"][data-f="mes_mm"]`), yyEl=mbox.querySelector(`[data-mi="${i}"][data-f="mes_yy"]`);
+      marcosDraft[i].mes=(yyEl?yyEl.value:'')+'-'+(mmEl?mmEl.value:'');
+    }
+  });
   mbox.addEventListener('click',e=>{ const i=e.target.dataset.rmMarco; if(i===undefined) return; marcosDraft.splice(+i,1); drawMarcos(); });
-  const pjReset=()=>{ editingPjId=null; document.getElementById('pj-form').reset(); marcosDraft=[]; drawMarcos(); totalDesp(); document.getElementById('pj-submit').textContent='Adicionar projeto'; document.getElementById('pj-cancel').hidden=true; };
+  const pjReset=()=>{ editingPjId=null; document.getElementById('pj-form').reset(); fillMonthSelect('pj-ini',5,25,''); fillMonthSelect('pj-fim',5,25,''); marcosDraft=[]; drawMarcos(); totalDesp(); document.getElementById('pj-submit').textContent='Adicionar projeto'; document.getElementById('pj-cancel').hidden=true; };
   document.getElementById('pj-cancel').addEventListener('click',pjReset);
   document.getElementById('pj-form').addEventListener('submit',e=>{
     e.preventDefault();
-    const ini=document.getElementById('pj-ini').value; let fim=document.getElementById('pj-fim').value; if(fim<ini) fim=ini;
+    const ini=getMonthSel('pj-ini'); let fim=getMonthSel('pj-fim'); if(fim<ini) fim=ini;
     const despCat={}; DESP_CATS.forEach(([k])=>despCat[k]=val('pj-d-'+k));
     const marcos=marcosDraft.filter(x=>x.mes&&x.valor>0).map(x=>({...x}));
     const p={ nome:document.getElementById('pj-nome').value.trim(), pct:Math.min(100,Math.max(0,val('pj-pct'))), ini, fim, despCat,
@@ -1620,7 +1660,7 @@ function initFluxo(){
     const ed=e.target.dataset.editPj, dl=e.target.dataset.delPj;
     if(dl&&confirm('Apagar este projeto?')){ projetos=projetos.filter(x=>x.id!==dl); savePj(); if(editingPjId===dl) pjReset(); renderFluxoTab(); }
     if(ed){ const p=projetos.find(x=>x.id===ed); editingPjId=ed;
-      document.getElementById('pj-nome').value=p.nome; document.getElementById('pj-pct').value=p.pct; document.getElementById('pj-ini').value=p.ini; document.getElementById('pj-fim').value=p.fim;
+      document.getElementById('pj-nome').value=p.nome; document.getElementById('pj-pct').value=p.pct; setMonthSel('pj-ini',p.ini); setMonthSel('pj-fim',p.fim);
       const cat=pjCat(p); DESP_CATS.forEach(([k])=>document.getElementById('pj-d-'+k).value=+cat[k]||0); totalDesp();
       document.getElementById('pj-rec').value=p.receita; document.getElementById('pj-recm').value=p.recMeses||1;
       marcosDraft=(p.marcos||[]).map(x=>({...x})); drawMarcos();
