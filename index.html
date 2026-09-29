@@ -511,6 +511,14 @@ function fromPassivosRows(rows){ return (rows||[]).map(r=>({id:r.id,categoria:r.
 function fromObjetivosRows(rows){ return (rows||[]).map(r=>({id:r.id,nome:r.nome,meta:+r.meta||0,metaMensal:+r.metaMensal||0,fixo:!!(+r.fixo)})); }
 function fromApolicesRows(rows){ return (rows||[]).map(r=>({id:r.id,tipo:r.tipo,seguradora:r.seguradora,cobertura:+r.cobertura||0,premio:+r.premio||0,vencimento:String(r.vencimento)})); }
 
+const CONFIG_KEYS=['saldoInicial','nascimento','idadeApos','longevidade','renda','outras','aporte','taxa','taxaRendaMensal'];
+function localConfigSnapshot(){ return {saldoInicial:fluxo.saldoInicial||0, nascimento:state.nascimento, idadeApos:state.idadeApos, longevidade:state.longevidade, renda:state.renda, outras:state.outras, aporte:state.aporte, taxa:state.taxa, taxaRendaMensal:state.taxaRendaMensal}; }
+function applyConfigToState(cfg){
+  fluxo.saldoInicial=+cfg.saldoInicial||0;
+  CONFIG_KEYS.slice(1).forEach(k=>{ if(cfg[k]!==undefined&&cfg[k]!=='') state[k]=(k==='nascimento')?String(cfg[k]):(+cfg[k]); });
+}
+let lastKnownConfig=null;
+
 async function syncPull(){
   const url=getApiUrl(); if(!url) return;
   setSyncStatus('Sincronizando…','busy');
@@ -523,7 +531,8 @@ async function syncPull(){
     passivos=fromPassivosRows(data.passivos);
     objetivos=(data.objetivos&&data.objetivos.length)?fromObjetivosRows(data.objetivos):defaultObjetivos();
     apolices=fromApolicesRows(data.apolices);
-    if(data.config){ const c=data.config; ['nascimento','idadeApos','longevidade','renda','outras','aporte','taxa','taxaRendaMensal'].forEach(k=>{ if(c[k]!==undefined&&c[k]!=='') state[k]=(k==='nascimento')?String(c[k]):(+c[k]); }); }
+    if(data.config) applyConfigToState(data.config);
+    lastKnownConfig=localConfigSnapshot();
     saveAt();savePv();saveOb();savePr();saveFx();savePj();
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}
     renderApp();
@@ -549,16 +558,26 @@ function syncPushAll(){
       objetivos=mergeById(objetivos, fromObjetivosRows(server.objetivos||[]));
       projetos=mergeById(projetos, fromProjetosRows(server.projetos,server.marcos));
       fluxo={...fluxo, meses:{...fromFluxoRows(server.fluxo), ...fluxo.meses}};
+      // config: campo por campo, só o que você mudou localmente desde o último sync sobrescreve o servidor;
+      // o resto (o que outra pessoa mudou direto na planilha) é respeitado.
+      const localCfg=localConfigSnapshot(), serverCfg=server.config||{}, mergedCfg={};
+      CONFIG_KEYS.forEach(k=>{
+        const mudouLocal = !lastKnownConfig || String(lastKnownConfig[k])!==String(localCfg[k]);
+        mergedCfg[k] = mudouLocal ? localCfg[k] : (serverCfg[k]!==undefined?serverCfg[k]:localCfg[k]);
+      });
+      applyConfigToState(mergedCfg);
       try{
         localStorage.setItem(S_AT,JSON.stringify(ativos)); localStorage.setItem(S_PV,JSON.stringify(passivos));
         localStorage.setItem(S_PR,JSON.stringify(apolices)); localStorage.setItem(S_OB,JSON.stringify(objetivos));
         localStorage.setItem(S_FX,JSON.stringify(fluxo)); localStorage.setItem(S_PJ,JSON.stringify(projetos));
+        localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
       }catch(e){}
 
       const post=body=>fetch(url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({...body,token:getToken()})});
       const sets=[['fluxo',toFluxoRows()],['projetos',toProjetosRows()],['marcos',toMarcosRows()],['ativos',toAtivosRows()],['passivos',toPassivosRows()],['objetivos',toObjetivosRows()],['apolices',toApolicesRows()]];
       for(const [collection,rows] of sets) await post({action:'set',collection,rows});
-      await post({action:'setConfig',config:{saldoInicial:fluxo.saldoInicial||0,nascimento:state.nascimento,idadeApos:state.idadeApos,longevidade:state.longevidade,renda:state.renda,outras:state.outras,aporte:state.aporte,taxa:state.taxa,taxaRendaMensal:state.taxaRendaMensal}});
+      await post({action:'setConfig',config:mergedCfg});
+      lastKnownConfig={...mergedCfg};
       renderApp();
       setSyncStatus('Sincronizado às '+new Date().toLocaleTimeString('pt-BR').slice(0,5),'ok');
     }catch(e){ setSyncStatus('Falha ao enviar: '+(e&&e.message?e.message:e),'err'); }
@@ -574,7 +593,7 @@ function initSync(){
     setToken(document.getElementById('sync-token').value.trim());
     syncPull();
   });
-  document.getElementById('sync-now').addEventListener('click',()=>{ syncPushAll(); });
+  document.getElementById('sync-now').addEventListener('click',()=>{ syncPull(); });
   if(getApiUrl()) syncPull();
 }
 
