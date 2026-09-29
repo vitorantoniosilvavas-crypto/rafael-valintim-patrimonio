@@ -259,6 +259,11 @@ td.num, th.num{text-align:right; white-space:nowrap;}
 
   <!-- ATIVOS -->
   <section class="tabpanel" id="tab-ativos">
+    <div class="panel" style="margin-bottom:20px">
+      <h2>Distribuição dos ativos</h2>
+      <p class="sub">Percentual de cada ativo lançado</p>
+      <div class="chart-wrap" id="at-pie"></div>
+    </div>
     <div class="grid-main">
       <div class="panel">
         <h2 id="at-form-title">Novo ativo</h2>
@@ -288,6 +293,11 @@ td.num, th.num{text-align:right; white-space:nowrap;}
 
   <!-- PASSIVOS -->
   <section class="tabpanel" id="tab-passivos">
+    <div class="panel" style="margin-bottom:20px">
+      <h2>Distribuição dos passivos</h2>
+      <p class="sub">Percentual de cada passivo lançado</p>
+      <div class="chart-wrap" id="pv-pie"></div>
+    </div>
     <div class="grid-main">
       <div class="panel">
         <h2 id="pv-form-title">Novo passivo</h2>
@@ -934,9 +944,15 @@ function valorAlocadoObjetivo(objId){
 function totalAtivos(list){ return (list||ativos).reduce((s,a)=>s+a.valor,0); }
 function totalPassivos(list){ return (list||passivos).reduce((s,a)=>s+a.valor,0); }
 let editingAtId=null;
+const PIE_PALETTE=['var(--cobalto)','var(--champagne)','var(--vinho)','#5B6B7F','var(--data-a)','#9AA7B8','#2F4A63','#B98A3E'];
+function renderItemPie(elId, list, emptyMsg){
+  const items=list.map((a,i)=>({label:a.descricao,value:a.valor,color:PIE_PALETTE[i%PIE_PALETTE.length]}));
+  renderDonut(elId, items, emptyMsg);
+}
 function renderAtTable(){
   const tbody=document.getElementById('at-tbody');
   const list=ativosView();
+  renderItemPie('at-pie', list, 'Nenhum ativo cadastrado ainda.');
   if(!list.length){tbody.innerHTML='';document.getElementById('at-empty').hidden=false;return;}
   document.getElementById('at-empty').hidden=true;
   tbody.innerHTML=list.map(a=>{
@@ -963,6 +979,7 @@ function renderAtTable(){
 function renderPvTable(){
   const tbody=document.getElementById('pv-tbody');
   const list=passivosView();
+  renderItemPie('pv-pie', list, 'Nenhum passivo cadastrado ainda.');
   if(!list.length){tbody.innerHTML='';document.getElementById('pv-empty').hidden=false;return;}
   document.getElementById('pv-empty').hidden=true;
   tbody.innerHTML=list.map(p=>`<tr data-id="${p.id}"><td>${p.categoria}</td><td>${p.descricao}</td><td>${p.titularidade==='PJ'?`PJ${p.empresa?' · '+p.empresa:''}`:'PF'}</td><td class="num">${fmt2.format(p.valor)}</td><td><div class="row-actions"><button data-del>excluir</button></div></td></tr>`).join('');
@@ -1066,14 +1083,15 @@ function ativoGeraRenda(a){ return typeof a.geraRenda==='boolean' ? a.geraRenda 
 
 function renderPainelTab(){
   const atv=ativosView(), pas=passivosView();
-  const tA=totalAtivos(atv), tP=totalPassivos(pas), liquido=tA-tP;
+  const caixa = viewMode==='PJ' ? caixaAtualEmpresa() : 0;
+  const tA=totalAtivos(atv)+caixa, tP=totalPassivos(pas), liquido=tA-tP;
   const rendaVal = atv.filter(ativoGeraRenda).reduce((s,a)=>s+a.valor,0);
   const renda = tA>0 ? rendaVal/tA*100 : 0;
   const endiv = tA>0 ? tP/tA*100 : 0;
   document.getElementById('pa-tiles').innerHTML=[
     {l:'Total de ativos',v:tA,c:'positive'},{l:'Total de passivos',v:tP,c:'negative'},{l:'Patrimônio líquido',v:liquido,c:'brass'},
   ].map(t=>`<div class="tile ${t.c}"><div class="label">${t.l}</div><div class="value num">${fmt2.format(t.v)}</div></div>`).join('');
-  document.getElementById('pa-composicao-sub').textContent = tA ? `${renda.toFixed(1)}% dos ativos geram renda · ${endiv.toFixed(1)}% de endividamento sobre os ativos` : 'Sem ativos cadastrados ainda.';
+  document.getElementById('pa-composicao-sub').textContent = tA ? `${renda.toFixed(1)}% dos ativos geram renda · ${endiv.toFixed(1)}% de endividamento sobre os ativos${caixa?` · inclui ${fmt.format(caixa)} de caixa atual`:''}` : 'Sem ativos cadastrados ainda.';
   renderComposicaoPie(tA, rendaVal);
   renderCategoriaDonut('pa-cat-ativos', atv, 'Investimento', 'Imóvel', 'Nenhum ativo cadastrado.');
   renderCategoriaDonut('pa-cat-passivos', pas, 'Financiamento', 'Empréstimo', 'Nenhum passivo cadastrado.');
@@ -1376,10 +1394,15 @@ function renderFxAlert(data){
   else el.innerHTML=`<div class="banner ok"><span class="stamp">Caixa ok</span><span>Caixa positivo até ${mesLabel(data[data.length-1].mes)}. Menor saldo projetado: <b>${fmt.format(min.caixa)}</b> em ${mesLabel(min.mes)}.</span></div>`;
 }
 
-function renderFluxoTab(){
+function caixaAtualEmpresa(){
   const cur=mesAtual();
   let caixa=+fluxo.saldoInicial||0;
   Object.entries(fluxo.meses).forEach(([m,v])=>{ if(m<=cur) caixa+=(v.ent||0)-(v.sai||0); });
+  return caixa;
+}
+function renderFluxoTab(){
+  const cur=mesAtual();
+  const caixa=caixaAtualEmpresa();
   const c=fluxo.meses[cur]||{ent:0,sai:0};
   document.getElementById('fx-tiles').innerHTML=[
     {l:'Caixa atual',v:caixa,c:'brass'},{l:'Entradas do mês',v:c.ent||0,c:'positive'},{l:'Saídas do mês',v:c.sai||0,c:'negative'},
