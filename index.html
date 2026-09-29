@@ -621,7 +621,8 @@ function simular(){
   const horizonAnos = state.longevidade;
   const horizonMeses = Math.max((horizonAnos - state.idade) * 12, mesesAcum);
   const saque = Math.max(state.renda - state.outras, 0);
-  const patrimonioAtual = ativos.filter(a=>ehPF(a)&&ativoGeraRenda(a)).reduce((s,a)=>s+a.valor,0);
+  const contaParaFuturo=a=>a.categoria==='Investimento'||a.categoria==='Imóvel';
+  const patrimonioAtual = ativos.filter(a=>ehPF(a)&&contaParaFuturo(a)).reduce((s,a)=>s+a.valor,0);
 
   let saldo = patrimonioAtual, principal = patrimonioAtual;
   const pontos = [{ idade: state.idade, saldo:patrimonioAtual, principal:patrimonioAtual }];
