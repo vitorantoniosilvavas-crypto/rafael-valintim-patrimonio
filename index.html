@@ -99,6 +99,8 @@ input[type=number]{width:100%; border:1px solid var(--line); background:var(--su
 .chart-empty{color:var(--muted); font-size:.85rem; padding:36px 0; text-align:center;}
 .coming-soon{color:var(--muted); font-size:.9rem; padding:40px 0; text-align:center;}
 form{display:flex; flex-direction:column; gap:10px;}
+form>div{min-width:0;}
+input, select, textarea{min-width:0; max-width:100%;}
 .row{display:flex; gap:8px; min-width:0;} .row>*{flex:1; min-width:0;}
 @media (max-width:640px){ .row{flex-wrap:wrap;} .row>*{flex:1 1 130px;} }
 label{font-size:.75rem; color:var(--muted); display:block; margin-bottom:3px;}
