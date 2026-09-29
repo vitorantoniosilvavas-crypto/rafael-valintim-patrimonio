@@ -192,7 +192,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
   <header class="top" id="top-header">
     <div>
       <div style="display:flex; align-items:baseline; gap:10px;">
-        <h1>Gestão Patrimonial</h1>
+        <h1 id="page-title">Gestão Patrimonial</h1>
         <span class="stamp" id="entity-badge">Rafael Oliveira Valintim</span>
       </div>
       <p id="entity-sub">Independência financeira, ativos, passivos e patrimônio líquido</p>
@@ -626,6 +626,7 @@ function applyMode(m){
   try{localStorage.setItem(S_VM,viewMode);}catch(e){}
   document.querySelectorAll('#workspace-switch button').forEach(x=>x.classList.toggle('active',x.dataset.v===viewMode));
   document.getElementById('sidebar').classList.toggle('mode-pj', viewMode==='PJ');
+  document.getElementById('page-title').textContent = viewMode==='PJ' ? 'Gestão Empresarial' : 'Gestão Patrimonial';
   document.getElementById('entity-badge').textContent = viewMode==='PJ' ? EMPRESA_NOME : 'Rafael Oliveira Valintim';
   document.getElementById('entity-sub').textContent = viewMode==='PJ' ? 'Ativos, passivos e fluxo de caixa da empresa' : 'Independência financeira, ativos, passivos e patrimônio líquido';
   updateContextNotes();
@@ -636,6 +637,7 @@ function initTabs(){
   document.querySelectorAll('#workspace-switch button').forEach(b=>b.addEventListener('click', ()=>applyMode(b.dataset.v)));
   document.getElementById('sidebar').classList.toggle('mode-pj', viewMode==='PJ');
   document.querySelectorAll('#workspace-switch button').forEach(x=>x.classList.toggle('active',x.dataset.v===viewMode));
+  document.getElementById('page-title').textContent = viewMode==='PJ' ? 'Gestão Empresarial' : 'Gestão Patrimonial';
   document.getElementById('entity-badge').textContent = viewMode==='PJ' ? EMPRESA_NOME : 'Rafael Oliveira Valintim';
   document.getElementById('entity-sub').textContent = viewMode==='PJ' ? 'Ativos, passivos e fluxo de caixa da empresa' : 'Independência financeira, ativos, passivos e patrimônio líquido';
   updateContextNotes();
