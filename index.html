@@ -103,6 +103,8 @@ form>div{min-width:0;}
 input, select, textarea{min-width:0; max-width:100%;}
 .month-picker{display:flex; gap:6px; min-width:0;}
 .month-picker select{flex:1; min-width:0;}
+.date-picker{display:flex; gap:4px; min-width:0;}
+.date-picker select{flex:1; min-width:0;}
 .row{display:flex; gap:8px; min-width:0;} .row>*{flex:1; min-width:0;}
 @media (max-width:640px){ .row{flex-wrap:wrap;} .row>*{flex:1 1 130px;} }
 label{font-size:.75rem; color:var(--muted); display:block; margin-bottom:3px;}
@@ -229,7 +231,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
 
         <div class="field">
           <div class="field-top"><label for="f-nascimento">Data de nascimento</label><span class="val num" id="f-idade-val"></span></div>
-          <input type="date" id="f-nascimento">
+          <div class="date-picker"><select id="f-nascimento-dd"></select><select id="f-nascimento-mm"></select><select id="f-nascimento-yy"></select></div>
         </div>
         <div class="field">
           <div class="field-top"><label for="f-idade-apos">Idade de aposentadoria</label><span class="val num" id="f-idade-apos-val"></span></div>
@@ -283,7 +285,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
           <div id="at-pais-wrap"><label for="at-pais">País do investimento</label><select id="at-pais"></select></div>
           <div class="row">
             <div><label for="at-valor">Valor ($)</label><input type="number" id="at-valor" min="0" step="0.01" required></div>
-            <div><label for="at-data">Data</label><input type="date" id="at-data" required></div>
+            <div><label>Data</label><div class="date-picker"><select id="at-data-dd" required></select><select id="at-data-mm" required></select><select id="at-data-yy" required></select></div></div>
           </div>
           <div><label>Gera renda? (é um patrimônio que coloca ou tira dinheiro do seu bolso?)</label><div class="toggle"><button type="button" data-v="1" class="active">Sim, gera</button><button type="button" data-v="0">Não gera</button></div></div>
           <div id="at-aloc-wrap"><label>Alocação por objetivo (%)</label><div class="aloc-grid" id="at-aloc"></div><div class="aloc-sum" id="at-aloc-sum"></div></div>
@@ -314,7 +316,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
           <div><label for="pv-desc">Descrição</label><input type="text" id="pv-desc" required></div>
           <div class="row">
             <div><label for="pv-valor">Saldo devedor ($)</label><input type="number" id="pv-valor" min="0" step="0.01" required></div>
-            <div><label for="pv-data">Data</label><input type="date" id="pv-data" required></div>
+            <div><label>Data</label><div class="date-picker"><select id="pv-data-dd" required></select><select id="pv-data-mm" required></select><select id="pv-data-yy" required></select></div></div>
           </div>
           <div class="row"><button type="submit" class="btn" id="pv-submit">Adicionar</button><button type="button" class="btn secondary" id="pv-cancel" hidden>Cancelar</button></div>
         </form>
@@ -431,7 +433,7 @@ td.num, th.num{text-align:right; white-space:nowrap;}
             <div><label for="pr-cobertura">Cobertura ($)</label><input type="number" id="pr-cobertura" min="0" step="0.01" required></div>
             <div><label for="pr-premio">Prêmio anual ($)</label><input type="number" id="pr-premio" min="0" step="0.01" value="0"></div>
           </div>
-          <div><label for="pr-venc">Vencimento</label><input type="date" id="pr-venc"></div>
+          <div><label>Vencimento</label><div class="date-picker"><select id="pr-venc-dd"></select><select id="pr-venc-mm"></select><select id="pr-venc-yy"></select></div></div>
           <div class="row"><button type="submit" class="btn" id="pr-submit">Adicionar</button><button type="button" class="btn secondary" id="pr-cancel" hidden>Cancelar</button></div>
         </form>
       </div>
@@ -830,7 +832,7 @@ function setIfNotFocused(id, val){
   if (document.activeElement !== el) el.value = val;
 }
 function syncFieldsUI(){
-  setIfNotFocused('f-nascimento', state.nascimento);
+  setDateVal('f-nascimento', state.nascimento);
   document.getElementById('f-idade-apos').value = state.idadeApos;
   document.getElementById('f-longevidade').value = state.longevidade;
   document.getElementById('f-renda').value = state.renda;
@@ -1309,8 +1311,9 @@ function initPatrimonioForms(){
   updateAtPaisVisibility();
   document.getElementById('at-categoria').addEventListener('change', ()=>{ updateAtPaisVisibility(); updateAtGeraRendaSuggestion(); });
   updateAtGeraRendaSuggestion();
-  document.getElementById('at-data').value=todayISO();
-  document.getElementById('pv-data').value=todayISO();
+  fillDateSelect('at-data',30,10,todayISO());
+  fillDateSelect('pv-data',30,10,todayISO());
+  fillDateSelect('pr-venc',10,60,'',true);
   document.querySelectorAll('#at-form .toggle button').forEach(b=>b.addEventListener('click',()=>{
     atGeraRenda=+b.dataset.v;
     document.querySelectorAll('#at-form .toggle button').forEach(x=>x.classList.toggle('active',x===b));
@@ -1322,11 +1325,11 @@ function initPatrimonioForms(){
     ativos.push({ id:uid('at'), categoria, descricao:document.getElementById('at-desc').value.trim(),
       pais: categoria==='Investimento'?document.getElementById('at-pais').value:'',
       valor:parseFloat(document.getElementById('at-valor').value)||0,
-      data:document.getElementById('at-data').value, geraRenda:!!atGeraRenda, alocacoes,
+      data:getDateSel('at-data'), geraRenda:!!atGeraRenda, alocacoes,
       titularidade:viewMode, empresa:viewMode==='PJ'?EMPRESA_NOME:'' });
     saveAt();
     document.getElementById('at-form').reset();
-    document.getElementById('at-data').value=todayISO();
+    fillDateSelect('at-data',30,10,todayISO());
     atGeraRenda=1;
     document.querySelectorAll('#at-form .toggle button').forEach(x=>x.classList.toggle('active',x.dataset.v==='1'));
     updateAtPaisVisibility();
@@ -1336,17 +1339,17 @@ function initPatrimonioForms(){
   document.getElementById('pv-form').addEventListener('submit', e=>{
     e.preventDefault();
     passivos.push({ id:uid('pv'), categoria:document.getElementById('pv-categoria').value, descricao:document.getElementById('pv-desc').value.trim(),
-      valor:parseFloat(document.getElementById('pv-valor').value)||0, data:document.getElementById('pv-data').value,
+      valor:parseFloat(document.getElementById('pv-valor').value)||0, data:getDateSel('pv-data'),
       titularidade:viewMode, empresa:viewMode==='PJ'?EMPRESA_NOME:'' });
-    savePv(); document.getElementById('pv-form').reset(); document.getElementById('pv-data').value=todayISO();
+    savePv(); document.getElementById('pv-form').reset(); fillDateSelect('pv-data',30,10,todayISO());
     renderApp();
   });
   document.getElementById('pr-form').addEventListener('submit', e=>{
     e.preventDefault();
     apolices.push({ id:uid('pr'), tipo:document.getElementById('pr-tipo').value, seguradora:document.getElementById('pr-seg').value.trim(),
       cobertura:parseFloat(document.getElementById('pr-cobertura').value)||0, premio:parseFloat(document.getElementById('pr-premio').value)||0,
-      vencimento:document.getElementById('pr-venc').value });
-    savePr(); document.getElementById('pr-form').reset(); renderApp();
+      vencimento:getDateSel('pr-venc') });
+    savePr(); document.getElementById('pr-form').reset(); fillDateSelect('pr-venc',10,60,'',true); renderApp();
   });
   document.getElementById('ob-form').addEventListener('submit', e=>{
     e.preventDefault();
@@ -1362,13 +1365,40 @@ const MESES_ABR=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','No
 const MESES_FULL=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 // Seletores de mês/ano em vez de <input type="month">: esse input nativo renderiza de forma inconsistente
 // (às vezes largo demais) em Safari/iOS, então usamos dois <select> comuns — idênticos em qualquer navegador.
-function mesOptionsHTML(selMM){ return MESES_FULL.map((n,i)=>{const v=String(i+1).padStart(2,'0'); return `<option value="${v}" ${v===selMM?'selected':''}>${n}</option>`;}).join(''); }
-function anoOptionsHTML(before,after,selYY){
+function mesOptionsHTML(selMM,emptyOk){ return (emptyOk?`<option value="">–</option>`:'')+MESES_FULL.map((n,i)=>{const v=String(i+1).padStart(2,'0'); return `<option value="${v}" ${v===selMM?'selected':''}>${n}</option>`;}).join(''); }
+function anoOptionsHTML(before,after,selYY,emptyOk){
   const y0=new Date().getFullYear()-before, y1=new Date().getFullYear()+after;
-  let out='', hit=false;
+  let out=emptyOk?`<option value="">–</option>`:'', hit=false;
   for(let a=y0;a<=y1;a++){ if(String(a)===selYY) hit=true; out+=`<option value="${a}" ${String(a)===selYY?'selected':''}>${a}</option>`; }
   if(selYY && !hit) out=`<option value="${selYY}" selected>${selYY}</option>`+out;
   return out;
+}
+function diaOptionsHTML(selDD,emptyOk){
+  let out=emptyOk?`<option value="">–</option>`:'';
+  for(let d=1;d<=31;d++){ const v=String(d).padStart(2,'0'); out+=`<option value="${v}" ${v===selDD?'selected':''}>${d}</option>`; }
+  return out;
+}
+// Mesma lógica do seletor de mês, agora com dia: <input type="date"> também renderiza
+// largo demais em Safari/iOS real e estoura a borda do card.
+function fillDateSelect(prefix,before,after,val,emptyOk){
+  const [yy,mm,dd]=(val||'').split('-');
+  const ddEl=document.getElementById(prefix+'-dd'), mmEl=document.getElementById(prefix+'-mm'), yyEl=document.getElementById(prefix+'-yy');
+  if(ddEl) ddEl.innerHTML=diaOptionsHTML(dd,emptyOk);
+  if(mmEl) mmEl.innerHTML=mesOptionsHTML(mm,emptyOk);
+  if(yyEl) yyEl.innerHTML=anoOptionsHTML(before,after,yy,emptyOk);
+}
+function getDateSel(prefix){
+  const dd=document.getElementById(prefix+'-dd'), mm=document.getElementById(prefix+'-mm'), yy=document.getElementById(prefix+'-yy');
+  if(!dd||!mm||!yy) return '';
+  if(!dd.value||!mm.value||!yy.value) return '';
+  return yy.value+'-'+mm.value+'-'+dd.value;
+}
+function setDateVal(prefix,val){
+  const [yy,mm,dd]=(val||'').split('-');
+  const ddEl=document.getElementById(prefix+'-dd'), mmEl=document.getElementById(prefix+'-mm'), yyEl=document.getElementById(prefix+'-yy');
+  if(ddEl && document.activeElement!==ddEl) ddEl.value=dd||'';
+  if(mmEl && document.activeElement!==mmEl) mmEl.value=mm||'';
+  if(yyEl && document.activeElement!==yyEl) yyEl.value=yy||'';
 }
 function fillMonthSelect(prefix,before,after,val){
   const [yy,mm]=(val||'').split('-');
@@ -1690,7 +1720,8 @@ function init(){
   initPatrimonioForms();
   loadFluxo(); initFluxo();
   initSync();
-  document.getElementById('f-nascimento').addEventListener('input', e=>{ state.nascimento = e.target.value; renderApp(); });
+  fillDateSelect('f-nascimento',90,0,state.nascimento);
+  ['f-nascimento-dd','f-nascimento-mm','f-nascimento-yy'].forEach(id=>document.getElementById(id).addEventListener('change', ()=>{ state.nascimento = getDateSel('f-nascimento'); renderApp(); }));
   bindSlider('f-idade-apos','idadeApos');
   bindSlider('f-longevidade','longevidade');
   bindSlider('f-renda','renda');
