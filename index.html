@@ -528,7 +528,7 @@ async function syncPull(){
     try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}catch(e){}
     renderApp();
     setSyncStatus('Sincronizado às '+new Date().toLocaleTimeString('pt-BR').slice(0,5),'ok');
-  }catch(e){ setSyncStatus('Falha ao puxar dados (offline?)','err'); }
+  }catch(e){ setSyncStatus('Falha ao puxar dados: '+(e&&e.message?e.message:e),'err'); }
 }
 
 let syncPushTimer=null, syncPushing=false;
@@ -561,7 +561,7 @@ function syncPushAll(){
       await post({action:'setConfig',config:{saldoInicial:fluxo.saldoInicial||0,nascimento:state.nascimento,idadeApos:state.idadeApos,longevidade:state.longevidade,renda:state.renda,outras:state.outras,aporte:state.aporte,taxa:state.taxa,taxaRendaMensal:state.taxaRendaMensal}});
       renderApp();
       setSyncStatus('Sincronizado às '+new Date().toLocaleTimeString('pt-BR').slice(0,5),'ok');
-    }catch(e){ setSyncStatus('Falha ao enviar (offline?)','err'); }
+    }catch(e){ setSyncStatus('Falha ao enviar: '+(e&&e.message?e.message:e),'err'); }
     finally{ syncPushing=false; }
   }, 900);
 }
@@ -571,7 +571,7 @@ function initSync(){
   document.getElementById('sync-token').value=getToken();
   document.getElementById('sync-save-url').addEventListener('click',()=>{
     setApiUrl(document.getElementById('sync-url').value.trim());
-    setToken(document.getElementById('sync-token').value);
+    setToken(document.getElementById('sync-token').value.trim());
     syncPull();
   });
   document.getElementById('sync-now').addEventListener('click',()=>{ syncPushAll(); });
